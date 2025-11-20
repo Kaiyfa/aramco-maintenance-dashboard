@@ -2,16 +2,19 @@
 Dashboard Views
 """
 from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from .models import Equipment, SensorData
 
 def index(request):
-    """Landing page"""
-    return render(request, 'dashboard/index.html')
+    equipment_count = Equipment.objects.count()
+    sensor_data_count = SensorData.objects.count()
+    
+    return JsonResponse({
+        'equipment_count': equipment_count,
+        'sensor_data_count': sensor_data_count,
+        'status': 'API is working'
+    })
 
-@login_required
-def dashboard_view(request):
-    """Main dashboard view"""
-    context = {
-        'page_title': 'Predictive Maintenance Dashboard'
-    }
-    return render(request, 'dashboard/dashboard.html', context)
+def equipment_list(request):
+    equipment = Equipment.objects.all().values('equipment_id', 'name', 'status')
+    return JsonResponse(list(equipment), safe=False)

@@ -18,6 +18,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=Csv(
 
 # Application definition
 INSTALLED_APPS = [
+    # Django apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -66,11 +67,11 @@ WSGI_APPLICATION = 'aramco_maintenance.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST'),
-        'PORT': config('DB_PORT'),
+        'NAME': 'aramco_maintenance',
+        'USER': 'aramco_admin',
+        'PASSWORD': 'your_secure_password_here',
+        'HOST': 'localhost',  # Docker expose le port 5432
+        'PORT': '5432',
     }
 }
 
