@@ -1,3 +1,6 @@
+"""
+Dashboard Views
+"""
 from django.shortcuts import render
 from django.http import JsonResponse
 from .models import Equipment, SensorData
