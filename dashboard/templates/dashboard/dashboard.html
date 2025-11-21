@@ -1,0 +1,472 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Dashboard - Aramco Predictive Maintenance{% endblock %}
+
+{% block content %}
+<div class="flex h-screen w-full bg-gray-50" x-data="dashboardData()">
+
+    <!-- Left Sidebar (280px fixed) -->
+    <aside class="w-80 border-r border-gray-200 bg-white p-6 space-y-6 overflow-y-auto">
+        <div>
+            <h2 class="text-xl font-semibold text-gray-900 mb-1">Control Panel</h2>
+            <p class="text-xs text-gray-500">Equipment Health Monitor</p>
+        </div>
+
+        <!-- Equipment Selector -->
+        <div class="space-y-4">
+            <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider border-b pb-2">Configuration</h3>
+
+            <!-- Equipment Type -->
+            <div>
+                <label for="equipmentType" class="block text-sm font-medium text-gray-700 mb-2">
+                    Equipment Type
+                </label>
+                <select id="equipmentType" x-model="equipmentType"
+                    class="w-full h-10 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                    <option value="Pump">Pump</option>
+                    <option value="Compressor">Compressor</option>
+                    <option value="Turbine">Turbine</option>
+                    <option value="Motor">Motor</option>
+                </select>
+            </div>
+
+            <!-- Equipment ID -->
+            <div>
+                <label for="equipmentId" class="block text-sm font-medium text-gray-700 mb-2">
+                    Equipment ID
+                </label>
+                <select id="equipmentId" x-model="equipmentId"
+                    class="w-full h-10 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                    <option value="EQ-006">EQ-006</option>
+                    <option value="EQ-001">EQ-001</option>
+                    <option value="EQ-002">EQ-002</option>
+                    <option value="EQ-003">EQ-003</option>
+                </select>
+            </div>
+
+            <!-- Location -->
+            <div>
+                <label for="location" class="block text-sm font-medium text-gray-700 mb-2">
+                    Location
+                </label>
+                <select id="location" x-model="location"
+                    class="w-full h-10 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm">
+                    <option value="Ghawar Field">Ghawar Field</option>
+                    <option value="Safaniya Field">Safaniya Field</option>
+                    <option value="Khurais Field">Khurais Field</option>
+                </select>
+            </div>
+
+            <!-- Data Source -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Data Source
+                </label>
+                <div class="space-y-2">
+                    <label class="flex items-center">
+                        <input type="radio" name="dataSource" value="simulated" x-model="dataSource"
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
+                        <span class="ml-2 text-sm text-gray-700">Simulated Data</span>
+                    </label>
+                    <label class="flex items-center">
+                        <input type="radio" name="dataSource" value="live" x-model="dataSource"
+                            class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300">
+                        <span class="ml-2 text-sm text-gray-700">Live Sensors</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Info -->
+        <div class="pt-6 border-t border-gray-200 space-y-4">
+            <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wider">System Info</h3>
+
+            <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Model Accuracy</p>
+                <p class="text-3xl font-bold font-mono text-gray-900">86.6%</p>
+            </div>
+
+            <div>
+                <p class="text-xs text-gray-500 uppercase tracking-wider mb-1">Total Predictions</p>
+                <p class="text-3xl font-bold font-mono text-gray-900">16</p>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto">
+        <div class="p-8 space-y-6">
+
+            <!-- Header -->
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-semibold text-gray-900">
+                        <span x-text="equipmentType"></span> <span x-text="equipmentId"></span>
+                    </h1>
+                    <p class="text-sm text-gray-500 mt-1" x-text="location"></p>
+                </div>
+                <div class="flex items-center gap-4">
+                    <!-- User Info -->
+                    <div class="text-right">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider">Logged in as</p>
+                        <p class="text-sm font-medium text-gray-900">{{ user.username }}</p>
+                    </div>
+
+                    <!-- Logout Button -->
+                    <a href="{% url 'logout' %}"
+                        class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors">
+                        Logout
+                    </a>
+
+                    <!-- Get Latest Prediction Button -->
+                    <button @click="getPrediction()"
+                        class="h-12 px-6 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                        Get Latest Prediction
+                    </button>
+                </div>
+            </div>
+
+            <!-- Primary Metrics Row -->
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+                <!-- RUL Gauge (Large) -->
+                <div class="lg:col-span-1">
+                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                        <div class="text-center">
+                            <p class="text-xs text-gray-500 uppercase tracking-wider mb-4">Predicted RUL</p>
+                            <div class="relative w-48 h-48 mx-auto">
+                                <canvas id="rulGauge"></canvas>
+                            </div>
+                            <p class="text-4xl font-bold font-mono text-gray-900 mt-4">43.9</p>
+                            <p class="text-sm text-gray-500">cycles</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Cards -->
+                <div class="lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                    <!-- Confidence Card -->
+                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Confidence</p>
+                        <p class="text-3xl font-bold font-mono text-gray-900">74.7%</p>
+                        <p class="text-sm text-gray-500 mt-1">Low</p>
+                    </div>
+
+                    <!-- Status Card -->
+                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Status</p>
+                        <div class="flex items-center gap-2 mt-2">
+                            <span
+                                class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
+                                ⚠️ CAUTION
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Next Maintenance Card -->
+                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                        <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Next Maintenance</p>
+                        <p class="text-3xl font-bold font-mono text-gray-900">Within</p>
+                        <p class="text-xl font-bold font-mono text-gray-900">1-2 months</p>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Health Gauges Row -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                <!-- Speed Health -->
+                <div class="bg-white rounded-lg border border-gray-200 p-6">
+                    <p class="text-sm font-semibold text-gray-700 mb-4 text-center">SPEED HEALTH</p>
+                    <div class="relative w-40 h-20 mx-auto">
+                        <canvas id="speedHealthGauge"></canvas>
+                    </div>
+                    <p class="text-2xl font-bold font-mono text-gray-900 text-center mt-4">74.2</p>
+                    <p class="text-sm text-gray-500 text-center">Health %</p>
+                </div>
+
+                <!-- Temperature Health -->
+                <div class="bg-white rounded-lg border border-gray-200 p-6">
+                    <p class="text-sm font-semibold text-gray-700 mb-4 text-center">TEMPERATURE HEALTH</p>
+                    <div class="relative w-40 h-20 mx-auto">
+                        <canvas id="temperatureHealthGauge"></canvas>
+                    </div>
+                    <p class="text-2xl font-bold font-mono text-gray-900 text-center mt-4">50.8</p>
+                    <p class="text-sm text-gray-500 text-center">Health %</p>
+                </div>
+
+                <!-- Pressure Health -->
+                <div class="bg-white rounded-lg border border-gray-200 p-6">
+                    <p class="text-sm font-semibold text-gray-700 mb-4 text-center">PRESSURE HEALTH</p>
+                    <div class="relative w-40 h-20 mx-auto">
+                        <canvas id="pressureHealthGauge"></canvas>
+                    </div>
+                    <p class="text-2xl font-bold font-mono text-gray-900 text-center mt-4">76.1</p>
+                    <p class="text-sm text-gray-500 text-center">Health %</p>
+                </div>
+
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="border-b border-gray-200">
+                <nav class="flex space-x-8" aria-label="Tabs">
+                    <button @click="activeTab = 'overview'"
+                        :class="activeTab === 'overview' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                        📊 Overview
+                    </button>
+                    <button @click="activeTab = 'ai'"
+                        :class="activeTab === 'ai' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                        🤖 AI Recommendations
+                    </button>
+                    <button @click="activeTab = 'trends'"
+                        :class="activeTab === 'trends' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                        📈 Trends
+                    </button>
+                    <button @click="activeTab = 'alerts'"
+                        :class="activeTab === 'alerts' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'"
+                        class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors">
+                        ⚠️ Alerts
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Tab Content -->
+            <div>
+                <!-- Overview Tab -->
+                <div x-show="activeTab === 'overview'" class="space-y-6">
+                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Top 5 Sensors (30 cycles)</h3>
+                        <div class="h-64 flex items-center justify-center text-gray-500">
+                            <canvas id="sensorTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Recommendations Tab -->
+                <div x-show="activeTab === 'ai'" class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">AI-Powered Recommendations</h3>
+                        <p class="text-sm text-gray-500 mb-6">
+                            Intelligent insights and actionable recommendations based on equipment health analysis
+                        </p>
+                    </div>
+
+                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                        <p class="text-gray-500 text-center py-8">AI recommendations will appear here</p>
+                    </div>
+                </div>
+
+                <!-- Trends Tab -->
+                <div x-show="activeTab === 'trends'" class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Degradation Analysis</h3>
+                        <p class="text-sm text-gray-500 mb-6">
+                            Historical trends and degradation rate analysis
+                        </p>
+                    </div>
+
+                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                        <p class="text-gray-500 text-center py-8">Trend analysis will appear here</p>
+                    </div>
+                </div>
+
+                <!-- Alerts Tab -->
+                <div x-show="activeTab === 'alerts'" class="space-y-6">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Active Alerts</h3>
+                        <p class="text-sm text-gray-500 mb-6">
+                            System notifications and maintenance recommendations
+                        </p>
+                    </div>
+
+                    <div class="bg-white rounded-lg border border-gray-200 p-6">
+                        <p class="text-gray-500 text-center py-8">Alerts will appear here</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Alpine.js Data
+    function dashboardData() {
+        return {
+            equipmentType: 'Pump',
+            equipmentId: 'EQ-006',
+            location: 'Ghawar Field',
+            dataSource: 'simulated',
+            activeTab: 'overview',
+
+            getPrediction() {
+                alert('Get Prediction clicked! This will connect to your Django backend.');
+            }
+        }
+    }
+
+    // Chart.js Gauges
+    document.addEventListener('DOMContentLoaded', function () {
+
+        // RUL Gauge (Circular)
+        const rulCtx = document.getElementById('rulGauge');
+        if (rulCtx) {
+            new Chart(rulCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [43.9, 56.1],
+                        backgroundColor: ['#f59e0b', '#e5e7eb'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    cutout: '75%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    }
+                }
+            });
+        }
+
+        // Speed Health Gauge (Semi-circular)
+        const speedCtx = document.getElementById('speedHealthGauge');
+        if (speedCtx) {
+            new Chart(speedCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [74.2, 25.8],
+                        backgroundColor: ['#22c55e', '#e5e7eb'],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    }
+                }
+            });
+        }
+
+        // Temperature Health Gauge
+        const tempCtx = document.getElementById('temperatureHealthGauge');
+        if (tempCtx) {
+            new Chart(tempCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [50.8, 49.2],
+                        backgroundColor: ['#f59e0b', '#e5e7eb'],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    }
+                }
+            });
+        }
+
+        // Pressure Health Gauge
+        const pressureCtx = document.getElementById('pressureHealthGauge');
+        if (pressureCtx) {
+            new Chart(pressureCtx, {
+                type: 'doughnut',
+                data: {
+                    datasets: [{
+                        data: [76.1, 23.9],
+                        backgroundColor: ['#22c55e', '#e5e7eb'],
+                        borderWidth: 0,
+                        circumference: 180,
+                        rotation: 270
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    }
+                }
+            });
+        }
+
+        // Sensor Trend Chart (placeholder)
+        const sensorCtx = document.getElementById('sensorTrendChart');
+        if (sensorCtx) {
+            new Chart(sensorCtx, {
+                type: 'line',
+                data: {
+                    labels: Array.from({ length: 30 }, (_, i) => i),
+                    datasets: [
+                        {
+                            label: 'Sensor 12',
+                            data: Array.from({ length: 30 }, () => Math.random() * 0.5 + 0.2),
+                            borderColor: '#ef4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            tension: 0.4,
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Sensor 7',
+                            data: Array.from({ length: 30 }, () => Math.random() * 0.5 + 0.1),
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            tension: 0.4,
+                            borderWidth: 2
+                        },
+                        {
+                            label: 'Sensor 21',
+                            data: Array.from({ length: 30 }, () => Math.random() * 0.5 - 0.2),
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                            tension: 0.4,
+                            borderWidth: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: true, position: 'top' }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

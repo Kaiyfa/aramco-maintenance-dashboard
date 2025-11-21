@@ -33,3 +33,8 @@ staticfiles/
 # OS
 .DS_Store
 Thumbs.db
+
+# Ignore large data files
+data/*
+ml_models/*
+!data/.gitkeep
