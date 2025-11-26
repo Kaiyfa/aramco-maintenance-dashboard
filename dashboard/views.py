@@ -4,6 +4,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.http import JsonResponse
 from .models import Equipment, SensorData
+from dashboard.ml.ml_service import prediction_service
+import json
+from datetime import datetime
+import logging
+logger = logging.getLogger(__name__)
+
 
 # AUTHENTICATION VIEWS
 
@@ -86,3 +92,47 @@ def equipment_list(request):
     """
     equipment = Equipment.objects.all().values('equipment_id', 'name', 'status')
     return JsonResponse(list(equipment), safe=False)
+
+
+@login_required(login_url='login')
+def get_prediction(request):
+    """
+    Generate AI prediction for equipment
+    """
+    if request.method == 'POST':
+        try:
+            # Get parameters from request
+            equipment_type = request.POST.get('equipment_type', 'Pump')
+            equipment_id = request.POST.get('equipment_id', 'EQ-006')
+            location = request.POST.get('location', 'Ghawar Field')
+            
+            # Load model if not already loaded
+            if not prediction_service.model_loaded:
+                prediction_service.load_model()
+            
+            # Generate prediction
+            prediction_result = prediction_service.predict_from_equipment(
+                equipment_id=equipment_id,
+                equipment_type=equipment_type,
+                cycles=30
+            )
+            
+            # Add metadata
+            prediction_result['location'] = location
+            prediction_result['timestamp'] = datetime.now().isoformat()
+            prediction_result['user'] = request.user.username
+            
+            # Return JSON response
+            return JsonResponse({
+                'success': True,
+                'prediction': prediction_result
+            })
+            
+        except Exception as e:
+            logger.error(f"Prediction error: {e}")
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+    
+    return JsonResponse({'error': 'Method not allowed'}, status=405)
