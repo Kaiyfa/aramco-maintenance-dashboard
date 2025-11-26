@@ -9,7 +9,8 @@ app_name = 'dashboard'
 urlpatterns = [
     # Main dashboard route (homepage)
     path('', views.dashboard, name='dashboard'),
-    
+    path('api/prediction/', views.get_prediction, name='get_prediction'), 
+
     # API endpoints
     path('api/index/', views.index, name='api_index'),
     path('api/equipment/', views.equipment_list, name='api_equipment_list'),

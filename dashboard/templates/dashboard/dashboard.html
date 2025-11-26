@@ -5,6 +5,7 @@
 
 {% block content %}
 <div class="flex h-screen w-full bg-gray-50" x-data="dashboardData()">
+    {% csrf_token %}
 
     <!-- Left Sidebar (280px fixed) -->
     <aside class="w-80 border-r border-gray-200 bg-white p-6 space-y-6 overflow-y-auto">
@@ -120,9 +121,20 @@
                     </a>
 
                     <!-- Get Latest Prediction Button -->
-                    <button @click="getPrediction()"
+                    <button @click="getPrediction()" :disabled="isLoading"
+                        :class="isLoading ? 'opacity-50 cursor-not-allowed' : ''"
                         class="h-12 px-6 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
-                        Get Latest Prediction
+                        <span x-show="!isLoading">Get Latest Prediction</span>
+                        <span x-show="isLoading" class="flex items-center">
+                            <svg class="animate-spin h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor"
+                                    stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor"
+                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                                </path>
+                            </svg>
+                            Loading...
+                        </span>
                     </button>
                 </div>
             </div>
@@ -138,7 +150,7 @@
                             <div class="relative w-48 h-48 mx-auto">
                                 <canvas id="rulGauge"></canvas>
                             </div>
-                            <p class="text-4xl font-bold font-mono text-gray-900 mt-4">43.9</p>
+                            <p class="text-4xl font-bold font-mono text-gray-900 mt-4" x-text="rul"></p>
                             <p class="text-sm text-gray-500">cycles</p>
                         </div>
                     </div>
@@ -150,17 +162,21 @@
                     <!-- Confidence Card -->
                     <div class="bg-white rounded-lg border border-gray-200 p-6">
                         <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Confidence</p>
-                        <p class="text-3xl font-bold font-mono text-gray-900">74.7%</p>
-                        <p class="text-sm text-gray-500 mt-1">Low</p>
+                        <p class="text-3xl font-bold font-mono text-gray-900"><span x-text="confidence"></span>%</p>
+                        <p class="text-sm text-gray-500 mt-1"
+                            x-text="confidence >= 80 ? 'High' : confidence >= 70 ? 'Medium' : 'Low'"></p>
                     </div>
 
                     <!-- Status Card -->
                     <div class="bg-white rounded-lg border border-gray-200 p-6">
                         <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Status</p>
                         <div class="flex items-center gap-2 mt-2">
-                            <span
-                                class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-yellow-100 text-yellow-800 border border-yellow-200">
-                                ⚠️ CAUTION
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold" :class="{'bg-green-100 text-green-800 border-green-200': status === 'healthy','bg-yellow-100 text-yellow-800 border-yellow-200': status === 'caution',
+                                        'bg-red-100 text-red-800 border-red-200': status === 'critical'
+                              }">
+                                <span x-show="status === 'healthy'">✅ HEALTHY</span>
+                                <span x-show="status === 'caution'">⚠️ CAUTION</span>
+                                <span x-show="status === 'critical'">🚨 CRITICAL</span>
                             </span>
                         </div>
                     </div>
@@ -168,8 +184,7 @@
                     <!-- Next Maintenance Card -->
                     <div class="bg-white rounded-lg border border-gray-200 p-6">
                         <p class="text-xs text-gray-500 uppercase tracking-wider mb-2">Next Maintenance</p>
-                        <p class="text-3xl font-bold font-mono text-gray-900">Within</p>
-                        <p class="text-xl font-bold font-mono text-gray-900">1-2 months</p>
+                        <p class="text-2xl font-bold font-mono text-gray-900" x-text="nextMaintenance"></p>
                     </div>
 
                 </div>
@@ -184,7 +199,17 @@
                     <div class="relative w-40 h-20 mx-auto">
                         <canvas id="speedHealthGauge"></canvas>
                     </div>
-                    <p class="text-2xl font-bold font-mono text-gray-900 text-center mt-4">74.2</p>
+                    <!-- Speed Health -->
+                    <p class="text-2xl font-bold font-mono text-gray-900 text-center mt-4"
+                        x-text="healthMetrics.speedHealth"></p>
+
+                    <!-- Temperature Health -->
+                    <p class="text-2xl font-bold font-mono text-gray-900 text-center mt-4"
+                        x-text="healthMetrics.temperatureHealth"></p>
+
+                    <!-- Pressure Health -->
+                    <p class="text-2xl font-bold font-mono text-gray-900 text-center mt-4"
+                        x-text="healthMetrics.pressureHealth"></p>
                     <p class="text-sm text-gray-500 text-center">Health %</p>
                 </div>
 
@@ -249,44 +274,95 @@
                 </div>
 
                 <!-- AI Recommendations Tab -->
-                <div x-show="activeTab === 'ai'" class="space-y-6">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">AI-Powered Recommendations</h3>
-                        <p class="text-sm text-gray-500 mb-6">
-                            Intelligent insights and actionable recommendations based on equipment health analysis
-                        </p>
-                    </div>
-
-                    <div class="bg-white rounded-lg border border-gray-200 p-6">
-                        <p class="text-gray-500 text-center py-8">AI recommendations will appear here</p>
-                    </div>
+                <!-- AI Recommendations Tab -->
+                <div x-show="activeTab === 'ai'" class="space-y-4"> <template x-for="rec in aiRecommendations"
+                        :key="rec.title">
+                        <div class="bg-white rounded-lg p-6 border-l-4" :class="{
+                 'border-red-500': rec.priority === 'high',
+                 'border-yellow-500': rec.priority === 'medium',
+                 'border-green-500': rec.priority === 'low'
+             }">
+                            <div class="flex items-start space-x-4">
+                                <span class="text-3xl" x-text="rec.icon"></span>
+                                <div class="flex-1">
+                                    <h3 class="text-lg font-semibold text-gray-900 mb-2" x-text="rec.title"></h3>
+                                    <p class="text-gray-600 mb-3" x-text="rec.description"></p>
+                                    <div class="flex items-center space-x-2 text-sm">
+                                        <span class="font-medium text-gray-700">Recommended Action:</span>
+                                        <span class="text-blue-600" x-text="rec.action"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
                 </div>
 
                 <!-- Trends Tab -->
-                <div x-show="activeTab === 'trends'" class="space-y-6">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Degradation Analysis</h3>
-                        <p class="text-sm text-gray-500 mb-6">
-                            Historical trends and degradation rate analysis
-                        </p>
-                    </div>
+                <!-- Trends Tab -->
+                <div x-show="activeTab === 'trends'" class="space-y-4">
+                    <div class="bg-white rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Prediction History</h3>
 
-                    <div class="bg-white rounded-lg border border-gray-200 p-6">
-                        <p class="text-gray-500 text-center py-8">Trend analysis will appear here</p>
+                        <template x-if="trendHistory.length === 0">
+                            <p class="text-gray-500 text-center py-8">No trend data yet. Generate predictions to see
+                                trends.</p>
+                        </template>
+
+                        <template x-if="trendHistory.length > 0">
+                            <div class="space-y-2">
+                                <template x-for="(trend, index) in trendHistory.slice().reverse()" :key="index">
+                                    <div class="flex items-center justify-between py-3 border-b border-gray-100">
+                                        <span class="text-sm text-gray-600" x-text="trend.timestamp"></span>
+                                        <div class="flex items-center space-x-4">
+                                            <span class="text-sm font-medium">RUL: <span
+                                                    x-text="trend.rul"></span></span>
+                                            <span class="text-sm">Confidence: <span
+                                                    x-text="trend.confidence"></span>%</span>
+                                            <span class="px-2 py-1 rounded text-xs font-medium" :class="{
+                                      'bg-green-100 text-green-800': trend.status === 'healthy',
+                                      'bg-yellow-100 text-yellow-800': trend.status === 'caution',
+                                      'bg-red-100 text-red-800': trend.status === 'critical'
+                                  }" x-text="trend.status.toUpperCase()"></span>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
                     </div>
                 </div>
 
                 <!-- Alerts Tab -->
-                <div x-show="activeTab === 'alerts'" class="space-y-6">
-                    <div>
-                        <h3 class="text-lg font-semibold text-gray-900 mb-2">Active Alerts</h3>
-                        <p class="text-sm text-gray-500 mb-6">
-                            System notifications and maintenance recommendations
-                        </p>
-                    </div>
+                <!-- Alerts Tab -->
+                <div x-show="activeTab === 'alerts'" class="space-y-4">
+                    <div class="bg-white rounded-lg p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Active Alerts</h3>
 
-                    <div class="bg-white rounded-lg border border-gray-200 p-6">
-                        <p class="text-gray-500 text-center py-8">Alerts will appear here</p>
+                        <template x-if="!alerts || alerts.length === 0">
+                            <p class="text-gray-500 text-center py-8">No active alerts. System operating normally.</p>
+                        </template>
+
+                        <template x-if="alerts && alerts.length > 0">
+                            <div class="space-y-3">
+                                <template x-for="alert in alerts.slice().reverse()" :key="alert.id">
+                                    <div class="flex items-start space-x-4 p-4 rounded-lg" :class="{
+                             'bg-red-50 border border-red-200': alert.type === 'critical',
+                             'bg-yellow-50 border border-yellow-200': alert.type === 'warning'
+                         }">
+                                        <span class="text-2xl">
+                                            <span x-show="alert.type === 'critical'">🚨</span>
+                                            <span x-show="alert.type === 'warning'">⚠️</span>
+                                        </span>
+                                        <div class="flex-1">
+                                            <div class="flex items-center justify-between mb-1">
+                                                <span class="font-medium text-gray-900" x-text="alert.equipment"></span>
+                                                <span class="text-xs text-gray-500" x-text="alert.timestamp"></span>
+                                            </div>
+                                            <p class="text-sm text-gray-700" x-text="alert.message"></p>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -308,11 +384,233 @@
             dataSource: 'simulated',
             activeTab: 'overview',
 
+            // Prediction data
+            rul: 43.9,
+            confidence: 74.7,
+            status: 'caution',
+            nextMaintenance: 'Dec 15, 2025',
+            healthMetrics: {
+                speedHealth: 74.2,
+                temperatureHealth: 50.8,
+                pressureHealth: 76.1
+            },
+            isLoading: false,
+
+            // NEW: AI Recommendations
+            aiRecommendations: [
+                {
+                    priority: 'medium',
+                    icon: '⚠️',
+                    title: 'Maintenance Planning Recommended',
+                    description: 'Equipment shows signs of degradation.',
+                    action: 'Schedule maintenance within the next week'
+                }
+            ],
+
+            // NEW: Trend History
+            trendHistory: [],
+
+            // NEW: Alerts
+            alerts: [],
+
+
             getPrediction() {
-                alert('Get Prediction clicked! This will connect to your Django backend.');
+                this.isLoading = true;
+
+                // Get CSRF token
+                const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+                // Create form data
+                const formData = new FormData();
+                formData.append('equipment_type', this.equipmentType);
+                formData.append('equipment_id', this.equipmentId);
+                formData.append('location', this.location);
+
+                // Call API
+                fetch('/api/prediction/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrftoken,
+                    },
+                    body: formData
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (data.success) {
+                            const pred = data.prediction;
+
+                            // Update all dashboard values instantly
+                            this.rul = pred.rul;
+                            this.confidence = pred.confidence;
+                            this.status = pred.status;
+                            this.healthMetrics = pred.health_metrics;
+
+                            // Calculate next maintenance (days based on RUL)
+                            const daysUntilMaintenance = Math.round(pred.rul * 0.1); // RUL cycles to days
+                            const nextMaintenanceDate = new Date();
+                            nextMaintenanceDate.setDate(nextMaintenanceDate.getDate() + daysUntilMaintenance);
+                            this.nextMaintenance = nextMaintenanceDate.toLocaleDateString('en-US', {
+                                month: 'short',
+                                day: 'numeric',
+                                year: 'numeric'
+                            });
+
+                            // Generate AI recommendations based on status
+                            this.generateRecommendations(pred);
+
+                            // Add to trend history
+                            this.addToTrends(pred);
+
+                            // Check for alerts
+                            this.checkAlerts(pred);
+
+                            // Show success notification (small, non-intrusive)
+                            this.showNotification('✅ Prediction Updated', 'success');
+                        } else {
+                            this.showNotification('❌ Error: ' + (data.error || 'Unknown error'), 'error');
+                        }
+                        this.isLoading = false;
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        this.showNotification('❌ Error: ' + error.message, 'error');
+                        this.isLoading = false;
+                    });
+            },
+
+            // Add these new methods to your Alpine.js data object
+            generateRecommendations(pred) {
+                this.aiRecommendations = [];
+
+                if (pred.status === 'critical') {
+                    this.aiRecommendations.push({
+                        priority: 'high',
+                        icon: '🚨',
+                        title: 'Immediate Maintenance Required',
+                        description: `Equipment ${pred.equipment_id} requires immediate attention. RUL is critically low at ${pred.rul} cycles.`,
+                        action: 'Schedule emergency maintenance within 24 hours'
+                    });
+                } else if (pred.status === 'caution') {
+                    this.aiRecommendations.push({
+                        priority: 'medium',
+                        icon: '⚠️',
+                        title: 'Maintenance Planning Recommended',
+                        description: `Equipment ${pred.equipment_id} shows signs of degradation. Current RUL: ${pred.rul} cycles.`,
+                        action: 'Schedule maintenance within the next week'
+                    });
+                } else {
+                    this.aiRecommendations.push({
+                        priority: 'low',
+                        icon: '✅',
+                        title: 'Equipment Operating Normally',
+                        description: `Equipment ${pred.equipment_id} is in good condition. RUL: ${pred.rul} cycles.`,
+                        action: 'Continue routine monitoring'
+                    });
+                }
+
+                // Add component-specific recommendations
+                if (pred.health_metrics.temperatureHealth < 60) {
+                    this.aiRecommendations.push({
+                        priority: 'medium',
+                        icon: '🌡️',
+                        title: 'Temperature Concern',
+                        description: 'Temperature sensor readings indicate potential cooling system issues.',
+                        action: 'Inspect cooling system and thermal sensors'
+                    });
+                }
+
+                if (pred.health_metrics.speedHealth < 70) {
+                    this.aiRecommendations.push({
+                        priority: 'medium',
+                        icon: '⚙️',
+                        title: 'Speed Anomaly Detected',
+                        description: 'Motor speed variations detected outside normal parameters.',
+                        action: 'Check motor bearings and drive system'
+                    });
+                }
+            },
+
+            addToTrends(pred) {
+                // Initialize trends array if not exists
+                if (!this.trendHistory) {
+                    this.trendHistory = [];
+                }
+
+                // Add new prediction to trends
+                this.trendHistory.push({
+                    timestamp: new Date().toLocaleTimeString(),
+                    rul: pred.rul,
+                    confidence: pred.confidence,
+                    status: pred.status
+                });
+
+                // Keep only last 10 predictions
+                if (this.trendHistory.length > 10) {
+                    this.trendHistory.shift();
+                }
+            },
+
+            checkAlerts(pred) {
+                // Initialize alerts array if not exists
+                if (!this.alerts) {
+                    this.alerts = [];
+                }
+
+                const now = new Date();
+
+                // Critical RUL alert
+                if (pred.rul < 30) {
+                    this.alerts.push({
+                        id: Date.now(),
+                        type: 'critical',
+                        equipment: pred.equipment_id,
+                        message: `Critical RUL: ${pred.rul} cycles remaining`,
+                        timestamp: now.toLocaleString(),
+                        acknowledged: false
+                    });
+                }
+
+                // Low confidence alert
+                if (pred.confidence < 70) {
+                    this.alerts.push({
+                        id: Date.now() + 1,
+                        type: 'warning',
+                        equipment: pred.equipment_id,
+                        message: `Low prediction confidence: ${pred.confidence}%`,
+                        timestamp: now.toLocaleString(),
+                        acknowledged: false
+                    });
+                }
+
+                // Keep only last 20 alerts
+                if (this.alerts.length > 20) {
+                    this.alerts = this.alerts.slice(-20);
+                }
+            },
+
+            showNotification(message, type) {
+                // Simple notification system
+                const notification = document.createElement('div');
+                notification.className = `fixed top-4 right-4 px-6 py-3 rounded-lg shadow-lg ${type === 'success' ? 'bg-green-500' : 'bg-red-500'
+                    } text-white z-50 transition-opacity duration-300`;
+                notification.textContent = message;
+
+                document.body.appendChild(notification);
+
+                // Auto-remove after 3 seconds
+                setTimeout(() => {
+                    notification.style.opacity = '0';
+                    setTimeout(() => notification.remove(), 300);
+                }, 3000);
             }
         }
     }
+
 
     // Chart.js Gauges
     document.addEventListener('DOMContentLoaded', function () {
