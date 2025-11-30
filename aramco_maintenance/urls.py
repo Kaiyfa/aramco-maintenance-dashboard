@@ -12,26 +12,16 @@ urlpatterns = [
     # Admin site
     path('admin/', admin.site.urls),
     
-    # Authentication
-    path('login/', dashboard_views.login_view, name='login'),
-    path('logout/', dashboard_views.logout_view, name='logout'),
+    # Authentication URLs
+    path('accounts/', include('django.contrib.auth.urls')),  
+    path('login/', dashboard_views.login_view, name='login'),  
+    path('logout/', dashboard_views.logout_view, name='logout'),  
     
-    # Dashboard app (protected routes)
-    path('', include('dashboard.urls')),
+    # Dashboard app (main routes)
+    path('', include('dashboard.urls', namespace='dashboard')), 
 ]
 
-# Serve static files in development
+# Serve static and media files in development
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
-urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('', include('dashboard.urls')),
-    path('accounts/', include('django.contrib.auth.urls')),
-]
-
-# Serve media files in development
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

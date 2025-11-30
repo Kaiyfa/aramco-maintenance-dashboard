@@ -233,3 +233,37 @@ class SystemConfiguration(models.Model):
     
     def __str__(self):
         return self.config_key
+class PredictionHistory(models.Model):
+    """Store prediction history for trends analysis"""
+    equipment = models.ForeignKey(
+        Equipment, 
+        on_delete=models.CASCADE, 
+        related_name='prediction_history'  # ✅ Changed from 'predictions'
+    )
+    timestamp = models.DateTimeField(auto_now_add=True)
+    rul = models.FloatField(help_text="Predicted Remaining Useful Life")
+    confidence = models.FloatField(help_text="Prediction confidence percentage")
+    status = models.CharField(max_length=20, choices=[
+        ('healthy', 'Healthy'),
+        ('caution', 'Caution'),
+        ('critical', 'Critical')
+    ])
+    data_source = models.CharField(max_length=20, choices=[
+        ('simulated', 'Simulated'),
+        ('live', 'Live Sensors')
+    ], default='simulated')
+    
+    # Health metrics
+    vibration_health = models.FloatField(default=0)
+    temperature_health = models.FloatField(default=0)
+    current_health = models.FloatField(default=0)
+    average_health = models.FloatField(default=0)
+    
+    class Meta:
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['equipment', '-timestamp']),
+        ]
+    
+    def __str__(self):
+        return f"{self.equipment.equipment_id} - RUL: {self.rul} - {self.timestamp}"

@@ -5,9 +5,13 @@ from django.contrib import messages
 from django.http import JsonResponse
 from .models import Equipment, SensorData
 from dashboard.ml.ml_service import prediction_service
-import json
+from django.db.models import Avg, Max, Min
 from datetime import datetime, timedelta
 import logging
+import time
+import json
+import numpy as np
+from django.utils import timezone 
 
 logger = logging.getLogger(__name__)
 
@@ -390,3 +394,291 @@ def calculate_trend_metrics(prediction: dict) -> dict:
         'degradationRate': round(degradation_rate, 2),
         'averageHealth': round(avg_health, 1)
     }
+
+
+# LIVE SENSOR API ENDPOINTS
+
+@login_required(login_url='login')
+def live_reading(request):
+    """
+    Fetch the absolute latest sensor reading from TimescaleDB
+    
+    Returns:
+        JSON with current sensor values and timestamp
+    """
+    try:
+        equipment_id = request.GET.get('equipment_id', 'EQ-006')
+        
+        # Fetch most recent sensor reading
+        latest_reading = SensorData.objects.filter(
+            equipment_id=equipment_id
+        ).order_by('-timestamp').first()
+        
+        if not latest_reading:
+            # No real data - return simulated live reading
+            return JsonResponse({
+                'success': True,
+                'source': 'simulated',
+                'timestamp': timezone.now().isoformat(),
+                'equipment_id': equipment_id,
+                'sensors': {
+                    'vibration_x': round(np.random.normal(0.5, 0.1), 3),
+                    'vibration_y': round(np.random.normal(0.6, 0.1), 3),
+                    'vibration_z': round(np.random.normal(0.4, 0.1), 3),
+                    'vibration_rms': round(np.random.normal(0.5, 0.08), 3),
+                    'vibration_peak': round(np.random.normal(0.8, 0.15), 3),
+                    'temperature': round(np.random.normal(45.0, 5.0), 1),
+                    'current': round(np.random.normal(5.2, 0.5), 2),
+                },
+                'thresholds': {
+                    'temperature_max': 85.0,
+                    'vibration_max': 2.5,
+                    'current_max': 10.0,
+                },
+                'alerts': []
+            })
+        
+        # Real data from TimescaleDB
+        sensors = {
+            'vibration_x': latest_reading.vibration_x,
+            'vibration_y': latest_reading.vibration_y,
+            'vibration_z': latest_reading.vibration_z,
+            'vibration_rms': latest_reading.vibration_rms,
+            'vibration_peak': latest_reading.vibration_peak,
+            'temperature': latest_reading.temperature,
+            'current': latest_reading.current,
+        }
+        
+        # Check threshold violations
+        thresholds = {
+            'temperature_max': 85.0,
+            'vibration_max': 2.5,
+            'current_max': 10.0,
+        }
+        
+        alerts = []
+        
+        if sensors['temperature'] > thresholds['temperature_max']:
+            alerts.append({
+                'severity': 'critical',
+                'sensor': 'temperature',
+                'message': f"HIGH TEMP: {sensors['temperature']:.1f}°C > {thresholds['temperature_max']}°C threshold",
+                'timestamp': latest_reading.timestamp.isoformat()
+            })
+        
+        if sensors['vibration_rms'] and sensors['vibration_rms'] > thresholds['vibration_max']:
+            alerts.append({
+                'severity': 'warning',
+                'sensor': 'vibration',
+                'message': f"HIGH VIBRATION: {sensors['vibration_rms']:.2f}g > {thresholds['vibration_max']}g threshold",
+                'timestamp': latest_reading.timestamp.isoformat()
+            })
+        
+        if sensors['current'] > thresholds['current_max']:
+            alerts.append({
+                'severity': 'warning',
+                'sensor': 'current',
+                'message': f"HIGH CURRENT: {sensors['current']:.1f}A > {thresholds['current_max']}A threshold",
+                'timestamp': latest_reading.timestamp.isoformat()
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'source': 'live',
+            'timestamp': latest_reading.timestamp.isoformat(),
+            'equipment_id': equipment_id,
+            'sensors': sensors,
+            'thresholds': thresholds,
+            'alerts': alerts
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error fetching live reading: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required(login_url='login')
+def live_prediction(request):
+    """
+    Generate ML prediction using last 30 live sensor readings
+    
+    This endpoint is called periodically (e.g., every 5 minutes) by the Live Dashboard
+    to update the RUL prediction based on accumulated real-time data.
+    
+    Returns:
+        JSON with RUL prediction and health metrics
+    """
+    try:
+        equipment_id = request.GET.get('equipment_id', 'EQ-006')
+        equipment_type = request.GET.get('equipment_type', 'Pump')
+        
+        logger.info(f"🔴 LIVE PREDICTION: Using real sensor data for {equipment_id}")
+        
+        # Load model if not already loaded
+        if not prediction_service.model_loaded:
+            logger.info("📦 Loading LSTM model...")
+            if not prediction_service.load_model():
+                raise Exception("Failed to load LSTM model")
+        
+        # Check if we have enough real sensor data
+        reading_count = SensorData.objects.filter(equipment_id=equipment_id).count()
+        
+        if reading_count < 30:
+            logger.warning(f"Only {reading_count} readings available. Using simulated data.")
+            # Fall back to simulated prediction
+            prediction_result = prediction_service.predict_from_equipment(
+                equipment_id=equipment_id,
+                equipment_type=equipment_type
+            )
+            prediction_result['data_source'] = 'simulated'
+        else:
+            # Use real live sensor data
+            prediction_result = prediction_service.predict_from_live_sensors(
+                equipment_id=equipment_id,
+                equipment_type=equipment_type
+            )
+        
+        # Get recent sensor statistics for context
+        recent_readings = SensorData.objects.filter(
+            equipment_id=equipment_id
+        ).order_by('-timestamp')[:100]
+        
+        if recent_readings.exists():
+            stats = recent_readings.aggregate(
+                avg_temp=Avg('temperature'),
+                max_temp=Max('temperature'),
+                avg_vibration_rms=Avg('vibration_rms'),
+                max_vibration_rms=Max('vibration_rms'),
+                avg_current=Avg('current'),
+                max_current=Max('current'),
+            )
+            
+            prediction_result['sensor_statistics'] = {
+                'temperature': {
+                    'average': round(stats['avg_temp'] or 0, 1),
+                    'max': round(stats['max_temp'] or 0, 1),
+                },
+                'vibration_rms': {
+                    'average': round(stats['avg_vibration_rms'] or 0, 3),
+                    'max': round(stats['max_vibration_rms'] or 0, 3),
+                },
+                'current': {
+                    'average': round(stats['avg_current'] or 0, 2),
+                    'max': round(stats['max_current'] or 0, 2),
+                }
+            }
+        
+        # Save to prediction history
+        from dashboard.models import PredictionHistory
+        PredictionHistory.objects.create(
+            equipment_id=equipment_id,
+            equipment_type=equipment_type,
+            location=request.GET.get('location', 'Ghawar Field'),
+            rul=prediction_result['rul'],
+            confidence=prediction_result['confidence'],
+            status=prediction_result['status'],
+            speed_health=prediction_result['health_metrics']['speedHealth'],
+            temperature_health=prediction_result['health_metrics']['temperatureHealth'],
+            pressure_health=prediction_result['health_metrics']['pressureHealth'],
+            data_source=prediction_result.get('data_source', 'live'),
+            model_used='LSTM',
+        )
+        
+        logger.info(f"✅ Live prediction complete: RUL={prediction_result['rul']:.1f}")
+        
+        return JsonResponse({
+            'success': True,
+            'prediction': prediction_result,
+            'reading_count': reading_count,
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error generating live prediction: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
+
+
+@login_required(login_url='login')
+def live_dashboard(request):
+    """
+    Live Sensor Dashboard view
+    Displays real-time sensor readings and continuous monitoring
+    """
+    context = {
+        'user': request.user,
+        'dashboard_type': 'live',
+    }
+    return render(request, 'dashboard/dashboard_live.html', context)
+
+
+@login_required(login_url='login')
+def live_sensor_history(request):
+    """
+    Fetch last N seconds of sensor readings for real-time charts
+    
+    Returns:
+        JSON with time-series sensor data for charting
+    """
+    try:
+        equipment_id = request.GET.get('equipment_id', 'EQ-006')
+        seconds = int(request.GET.get('seconds', 60))  # Default: last 60 seconds
+        
+        # Calculate time range
+        end_time = datetime.now()
+        start_time = end_time - timedelta(seconds=seconds)
+        
+        # Fetch readings in time range
+        readings = SensorData.objects.filter(
+            equipment_id=equipment_id,
+            timestamp__gte=start_time,
+            timestamp__lte=end_time
+        ).order_by('timestamp')
+        
+        # Format for charting
+        data = {
+            'timestamps': [],
+            'temperature': [],
+            'vibration_rms': [],
+            'current': [],
+        }
+        
+        for reading in readings:
+            data['timestamps'].append(reading.timestamp.isoformat())
+            data['temperature'].append(reading.temperature)
+            data['vibration_rms'].append(reading.vibration_rms or 0)
+            data['current'].append(reading.current)
+        
+        # If no real data, generate simulated historical data
+        if not readings.exists():
+            logger.warning("No real sensor history. Generating simulated data.")
+            num_points = 12  # 12 points for 60 seconds (5 sec intervals)
+            current_time = end_time
+            
+            for i in range(num_points):
+                timestamp = current_time - timedelta(seconds=(num_points - i - 1) * 5)
+                data['timestamps'].append(timestamp.isoformat())
+                data['temperature'].append(round(45.0 + np.random.normal(0, 2), 1))
+                data['vibration_rms'].append(round(0.5 + np.random.normal(0, 0.1), 3))
+                data['current'].append(round(5.2 + np.random.normal(0, 0.3), 2))
+        
+        return JsonResponse({
+            'success': True,
+            'equipment_id': equipment_id,
+            'time_range_seconds': seconds,
+            'data_points': len(data['timestamps']),
+            'data': data
+        })
+        
+    except Exception as e:
+        logger.error(f"❌ Error fetching sensor history: {e}")
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=500)
