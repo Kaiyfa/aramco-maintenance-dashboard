@@ -1,0 +1,1131 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Live Monitoring - Aramco Predictive Maintenance{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ============================================================================
+   ARAMCO LIVE SENSOR DASHBOARD - PRODUCTION STYLES
+   Real-time monitoring interface with emphasis on sensor readings
+   ============================================================================ */
+
+:root {
+    --background: #0a0e1a;
+    --foreground: #e2e8f0;
+    --card: #1a1f35;
+    --card-foreground: #e2e8f0;
+    --border: #2d3548;
+    --muted: #1e2435;
+    --muted-foreground: #94a3b8;
+    --primary: #3b82f6;
+    --accent: #1e293b;
+    
+    /* Live status colors */
+    --live-green: #10b981;
+    --live-red: #ef4444;
+    --live-yellow: #f59e0b;
+    
+    /* Alert colors */
+    --alert-critical: #ef4444;
+    --alert-warning: #f59e0b;
+    --alert-info: #3b82f6;
+}
+
+body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
+/* ============================================================================
+   LAYOUT
+   ============================================================================ */
+
+.live-dashboard-container {
+    min-height: 100vh;
+    padding: 1.5rem;
+}
+
+/* Header with Live Status */
+.live-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding: 1.5rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+}
+
+.live-header-left {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+}
+
+.live-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1.5rem;
+    background: rgba(16, 185, 129, 0.1);
+    border: 2px solid var(--live-green);
+    border-radius: 0.5rem;
+    animation: pulse 2s infinite;
+}
+
+.live-status-indicator.stopped {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: var(--live-red);
+    animation: none;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.live-dot {
+    width: 1rem;
+    height: 1rem;
+    border-radius: 50%;
+    background-color: var(--live-green);
+    box-shadow: 0 0 10px var(--live-green);
+}
+
+.live-dot.stopped {
+    background-color: var(--live-red);
+    box-shadow: 0 0 10px var(--live-red);
+}
+
+.live-status-text {
+    font-weight: 600;
+    font-size: 1.125rem;
+    color: var(--live-green);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.live-status-text.stopped {
+    color: var(--live-red);
+}
+
+.equipment-info h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.equipment-info p {
+    color: var(--muted-foreground);
+}
+
+.live-header-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* Control Button */
+.control-button {
+    padding: 1rem 2rem;
+    font-size: 1.125rem;
+    font-weight: 600;
+    border: none;
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.control-button.start {
+    background-color: var(--live-green);
+    color: white;
+}
+
+.control-button.start:hover {
+    background-color: #059669;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.control-button.stop {
+    background-color: var(--live-red);
+    color: white;
+}
+
+.control-button.stop:hover {
+    background-color: #dc2626;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+/* ============================================================================
+   SENSOR READINGS - Large Digital Display
+   ============================================================================ */
+
+.sensor-readings-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.sensor-reading-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 2rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.sensor-reading-card.alert {
+    border: 2px solid var(--alert-critical);
+    background: rgba(239, 68, 68, 0.05);
+    animation: alertBlink 1s infinite;
+}
+
+@keyframes alertBlink {
+    0%, 100% { border-color: var(--alert-critical); }
+    50% { border-color: transparent; }
+}
+
+.sensor-label {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+}
+
+.sensor-value {
+    font-family: 'Courier New', monospace;
+    font-size: 4rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-bottom: 0.5rem;
+    color: var(--foreground);
+}
+
+.sensor-unit {
+    font-size: 1.5rem;
+    color: var(--muted-foreground);
+    margin-left: 0.5rem;
+}
+
+.sensor-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.875rem;
+    margin-top: 1rem;
+}
+
+.sensor-status-dot {
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    background-color: var(--live-green);
+}
+
+.sensor-status-dot.warning {
+    background-color: var(--live-yellow);
+}
+
+.sensor-status-dot.critical {
+    background-color: var(--live-red);
+}
+
+/* ============================================================================
+   RUL PREDICTION SECTION
+   ============================================================================ */
+
+.rul-prediction-section {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.rul-gauge-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.rul-gauge-label {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 1rem;
+}
+
+.rul-gauge-value {
+    font-family: 'Courier New', monospace;
+    font-size: 4.5rem;
+    font-weight: 700;
+    color: var(--foreground);
+    margin-bottom: 0.5rem;
+}
+
+.rul-gauge-subtitle {
+    font-size: 1rem;
+    color: var(--muted-foreground);
+}
+
+.rul-update-time {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    margin-top: 1rem;
+}
+
+.prediction-metrics-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 2rem;
+}
+
+.prediction-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+}
+
+.prediction-metric {
+    text-align: center;
+}
+
+.prediction-metric-label {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.75rem;
+}
+
+.prediction-metric-value {
+    font-family: 'Courier New', monospace;
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--foreground);
+}
+
+.prediction-metric-subtitle {
+    font-size: 0.875rem;
+    color: var(--muted-foreground);
+    margin-top: 0.5rem;
+}
+
+/* ============================================================================
+   LIVE CHARTS
+   ============================================================================ */
+
+.live-charts-section {
+    margin-bottom: 2rem;
+}
+
+.section-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 1.5rem;
+    color: var(--foreground);
+}
+
+.live-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+}
+
+.live-chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    padding: 1.5rem;
+}
+
+.chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.chart-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--foreground);
+}
+
+.chart-threshold {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+.chart-container {
+    height: 200px;
+    position: relative;
+}
+
+/* ============================================================================
+   ALERTS PANEL
+   ============================================================================ */
+
+.alerts-section {
+    margin-bottom: 2rem;
+}
+
+.alerts-grid {
+    display: grid;
+    gap: 1rem;
+}
+
+.alert-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--alert-critical);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.alert-item.warning {
+    border-left-color: var(--alert-warning);
+}
+
+.alert-item.info {
+    border-left-color: var(--alert-info);
+}
+
+.alert-icon {
+    font-size: 1.5rem;
+}
+
+.alert-content {
+    flex: 1;
+}
+
+.alert-message {
+    font-weight: 600;
+    font-size: 1rem;
+    margin-bottom: 0.25rem;
+}
+
+.alert-timestamp {
+    font-size: 0.75rem;
+    color: var(--muted-foreground);
+}
+
+.no-alerts {
+    text-align: center;
+    padding: 3rem;
+    color: var(--muted-foreground);
+}
+
+/* ============================================================================
+   RESPONSIVE
+   ============================================================================ */
+
+@media (max-width: 1280px) {
+    .sensor-readings-grid,
+    .live-charts-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .rul-prediction-section {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .sensor-readings-grid,
+    .live-charts-grid,
+    .prediction-metrics-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .live-header {
+        flex-direction: column;
+        gap: 1rem;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="live-dashboard-container">
+    {% csrf_token %}
+    
+    <!-- Header with Live Status -->
+    <div class="live-header">
+        <div class="live-header-left">
+            <div class="live-status-indicator" id="liveStatusIndicator">
+                <div class="live-dot" id="liveDot"></div>
+                <span class="live-status-text" id="liveStatusText">LIVE DATA STREAMING</span>
+            </div>
+            
+            <div class="equipment-info">
+                <h1 id="equipmentTitle">Pump EQ-006</h1>
+                <p id="equipmentLocation">Ghawar Field • Live Monitoring</p>
+            </div>
+        </div>
+        
+        <div class="live-header-right">
+            <span style="font-size: 0.875rem; color: var(--muted-foreground);">Logged in as <strong>{{ user.username }}</strong></span>
+            <a href="{% url 'dashboard:dashboard' %}" class="btn btn-secondary" style="padding: 0.75rem 1.5rem; background: var(--card); border: 1px solid var(--border); color: var(--foreground); text-decoration: none; border-radius: 0.5rem;">
+                ← Historical Dashboard
+            </a>
+            <button id="controlButton" class="control-button start">
+                <span id="controlIcon">⏸</span>
+                <span id="controlText">STOP</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Live Sensor Readings -->
+    <div class="sensor-readings-grid">
+        <!-- Temperature -->
+        <div class="sensor-reading-card" id="tempCard">
+            <div class="sensor-label">🌡️ TEMPERATURE</div>
+            <div class="sensor-value" id="tempValue">--<span class="sensor-unit">°C</span></div>
+            <div class="sensor-status">
+                <div class="sensor-status-dot" id="tempStatusDot"></div>
+                <span id="tempStatus">Normal</span>
+            </div>
+        </div>
+        
+        <!-- Vibration -->
+        <div class="sensor-reading-card" id="vibrationCard">
+            <div class="sensor-label">📊 VIBRATION (RMS)</div>
+            <div class="sensor-value" id="vibrationValue">--<span class="sensor-unit">g</span></div>
+            <div class="sensor-status">
+                <div class="sensor-status-dot" id="vibrationStatusDot"></div>
+                <span id="vibrationStatus">Normal</span>
+            </div>
+        </div>
+        
+        <!-- Current -->
+        <div class="sensor-reading-card" id="currentCard">
+            <div class="sensor-label">⚡ CURRENT</div>
+            <div class="sensor-value" id="currentValue">--<span class="sensor-unit">A</span></div>
+            <div class="sensor-status">
+                <div class="sensor-status-dot" id="currentStatusDot"></div>
+                <span id="currentStatus">Normal</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- RUL Prediction Section -->
+    <div class="rul-prediction-section">
+        <div class="rul-gauge-card">
+            <div class="rul-gauge-label">PREDICTED RUL</div>
+            <div class="rul-gauge-value" id="rulValue">--</div>
+            <div class="rul-gauge-subtitle">CYCLES</div>
+            <div class="rul-update-time" id="rulUpdateTime">Last updated: Never</div>
+        </div>
+        
+        <div class="prediction-metrics-card">
+            <div class="prediction-metrics-grid">
+                <div class="prediction-metric">
+                    <div class="prediction-metric-label">CONFIDENCE</div>
+                    <div class="prediction-metric-value" id="confidenceValue">--%</div>
+                    <div class="prediction-metric-subtitle" id="confidenceLevel">--</div>
+                </div>
+                
+                <div class="prediction-metric">
+                    <div class="prediction-metric-label">STATUS</div>
+                    <div class="prediction-metric-value" style="font-size: 1.5rem;" id="statusValue">--</div>
+                    <div class="prediction-metric-subtitle">Equipment Health</div>
+                </div>
+                
+                <div class="prediction-metric">
+                    <div class="prediction-metric-label">DATA SOURCE</div>
+                    <div class="prediction-metric-value" style="font-size: 1.5rem;" id="dataSourceValue">🔴 LIVE</div>
+                    <div class="prediction-metric-subtitle" id="readingCount">0 readings</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Charts -->
+    <div class="live-charts-section">
+        <h2 class="section-title">Real-Time Sensor Trends (Last 60 Seconds)</h2>
+        
+        <div class="live-charts-grid">
+            <!-- Temperature Chart -->
+            <div class="live-chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">Temperature</div>
+                    <div class="chart-threshold">Threshold: 85°C</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="tempChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Vibration Chart -->
+            <div class="live-chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">Vibration (RMS)</div>
+                    <div class="chart-threshold">Threshold: 2.5g</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="vibrationChart"></canvas>
+                </div>
+            </div>
+            
+            <!-- Current Chart -->
+            <div class="live-chart-card">
+                <div class="chart-header">
+                    <div class="chart-title">Current</div>
+                    <div class="chart-threshold">Threshold: 10A</div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="currentChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Alerts -->
+    <div class="alerts-section">
+        <h2 class="section-title">Active Alerts</h2>
+        <div class="alerts-grid" id="alertsContainer">
+            <div class="no-alerts">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
+                <div>No active alerts. All systems normal.</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// ============================================================================
+// LIVE DASHBOARD - JAVASCRIPT
+// Handles real-time sensor monitoring and chart updates
+// ============================================================================
+
+let liveState = {
+    isMonitoring: true,
+    equipmentId: 'EQ-006',
+    equipmentType: 'Pump',
+    location: 'Ghawar Field',
+    
+    // Polling intervals
+    sensorPollInterval: null,
+    predictionPollInterval: null,
+    historyPollInterval: null,
+    
+    // Charts
+    charts: {},
+    
+    // Data
+    currentReading: null,
+    currentPrediction: null,
+    alerts: [],
+    
+    // Settings
+    sensorRefreshRate: 2000,      // 2 seconds
+    predictionRefreshRate: 300000, // 5 minutes
+    historyRefreshRate: 5000,      // 5 seconds
+};
+
+// ============================================================================
+// INITIALIZATION
+// ============================================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔴 Live Dashboard initializing...');
+    
+    initializeCharts();
+    setupEventListeners();
+    startMonitoring();
+    
+    console.log('✅ Live Dashboard ready');
+});
+
+// ============================================================================
+// CHART INITIALIZATION
+// ============================================================================
+
+function initializeCharts() {
+    const chartConfig = {
+        type: 'line',
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: {
+                duration: 0 // No animation for real-time
+            },
+            plugins: {
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            },
+            scales: {
+                x: {
+                    type: 'time',
+                    time: {
+                        unit: 'second',
+                        displayFormats: {
+                            second: 'HH:mm:ss'
+                        }
+                    },
+                    ticks: {
+                        color: '#94a3b8',
+                        maxTicksLimit: 6
+                    },
+                    grid: {
+                        color: 'rgba(148, 163, 184, 0.1)'
+                    }
+                },
+                y: {
+                    ticks: {
+                        color: '#94a3b8'
+                    },
+                    grid: {
+                        color: 'rgba(148, 163, 184, 0.1)'
+                    }
+                }
+            }
+        }
+    };
+    
+    // Temperature Chart
+    liveState.charts.temperature = new Chart(document.getElementById('tempChart'), {
+        ...chartConfig,
+        data: {
+            datasets: [
+                {
+                    label: 'Temperature',
+                    data: [],
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Threshold',
+                    data: [],
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0
+                }
+            ]
+        }
+    });
+    
+    // Vibration Chart
+    liveState.charts.vibration = new Chart(document.getElementById('vibrationChart'), {
+        ...chartConfig,
+        data: {
+            datasets: [
+                {
+                    label: 'Vibration RMS',
+                    data: [],
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Threshold',
+                    data: [],
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0
+                }
+            ]
+        }
+    });
+    
+    // Current Chart
+    liveState.charts.current = new Chart(document.getElementById('currentChart'), {
+        ...chartConfig,
+        data: {
+            datasets: [
+                {
+                    label: 'Current',
+                    data: [],
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    borderWidth: 2,
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Threshold',
+                    data: [],
+                    borderColor: '#ef4444',
+                    borderWidth: 2,
+                    borderDash: [5, 5],
+                    pointRadius: 0
+                }
+            ]
+        }
+    });
+    
+    console.log('✅ Charts initialized');
+}
+
+// ============================================================================
+// EVENT LISTENERS
+// ============================================================================
+
+function setupEventListeners() {
+    const controlButton = document.getElementById('controlButton');
+    controlButton.addEventListener('click', toggleMonitoring);
+}
+
+function toggleMonitoring() {
+    if (liveState.isMonitoring) {
+        stopMonitoring();
+    } else {
+        startMonitoring();
+    }
+}
+
+// ============================================================================
+// MONITORING CONTROL
+// ============================================================================
+
+function startMonitoring() {
+    console.log('▶️  Starting live monitoring...');
+    
+    liveState.isMonitoring = true;
+    
+    // Update UI
+    updateLiveStatus(true);
+    
+    // Start polling
+    fetchSensorReading();  // Immediate first fetch
+    liveState.sensorPollInterval = setInterval(fetchSensorReading, liveState.sensorRefreshRate);
+    
+    fetchPrediction();  // Immediate first fetch
+    liveState.predictionPollInterval = setInterval(fetchPrediction, liveState.predictionRefreshRate);
+    
+    fetchSensorHistory();  // Immediate first fetch
+    liveState.historyPollInterval = setInterval(fetchSensorHistory, liveState.historyRefreshRate);
+    
+    console.log('✅ Monitoring started');
+}
+
+function stopMonitoring() {
+    console.log('⏸  Stopping live monitoring...');
+    
+    liveState.isMonitoring = false;
+    
+    // Update UI
+    updateLiveStatus(false);
+    
+    // Stop polling
+    clearInterval(liveState.sensorPollInterval);
+    clearInterval(liveState.predictionPollInterval);
+    clearInterval(liveState.historyPollInterval);
+    
+    console.log('✅ Monitoring stopped');
+}
+
+function updateLiveStatus(isLive) {
+    const indicator = document.getElementById('liveStatusIndicator');
+    const dot = document.getElementById('liveDot');
+    const text = document.getElementById('liveStatusText');
+    const button = document.getElementById('controlButton');
+    const icon = document.getElementById('controlIcon');
+    const buttonText = document.getElementById('controlText');
+    
+    if (isLive) {
+        indicator.classList.remove('stopped');
+        dot.classList.remove('stopped');
+        text.classList.remove('stopped');
+        text.textContent = 'LIVE DATA STREAMING';
+        button.classList.remove('start');
+        button.classList.add('stop');
+        icon.textContent = '⏸';
+        buttonText.textContent = 'STOP';
+    } else {
+        indicator.classList.add('stopped');
+        dot.classList.add('stopped');
+        text.classList.add('stopped');
+        text.textContent = 'MONITORING STOPPED';
+        button.classList.remove('stop');
+        button.classList.add('start');
+        icon.textContent = '▶️';
+        buttonText.textContent = 'START';
+    }
+}
+
+// ============================================================================
+// API CALLS
+// ============================================================================
+
+async function fetchSensorReading() {
+    try {
+        const response = await fetch(`/api/live/reading/?equipment_id=${liveState.equipmentId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            liveState.currentReading = data;
+            updateSensorDisplays(data);
+            updateAlerts(data.alerts);
+        }
+    } catch (error) {
+        console.error('❌ Error fetching sensor reading:', error);
+    }
+}
+
+async function fetchPrediction() {
+    try {
+        const response = await fetch(
+            `/api/live/prediction/?equipment_id=${liveState.equipmentId}&equipment_type=${liveState.equipmentType}`
+        );
+        const data = await response.json();
+        
+        if (data.success) {
+            liveState.currentPrediction = data;
+            updatePredictionDisplays(data);
+        }
+    } catch (error) {
+        console.error('❌ Error fetching prediction:', error);
+    }
+}
+
+async function fetchSensorHistory() {
+    try {
+        const response = await fetch(`/api/live/history/?equipment_id=${liveState.equipmentId}&seconds=60`);
+        const data = await response.json();
+        
+        if (data.success) {
+            updateCharts(data.data);
+        }
+    } catch (error) {
+        console.error('❌ Error fetching sensor history:', error);
+    }
+}
+
+// ============================================================================
+// UI UPDATES
+// ============================================================================
+
+function updateSensorDisplays(data) {
+    const sensors = data.sensors;
+    const thresholds = data.thresholds;
+    
+    // Temperature
+    const temp = sensors.temperature;
+    document.getElementById('tempValue').innerHTML = `${temp.toFixed(1)}<span class="sensor-unit">°C</span>`;
+    
+    const tempCard = document.getElementById('tempCard');
+    const tempDot = document.getElementById('tempStatusDot');
+    const tempStatus = document.getElementById('tempStatus');
+    
+    if (temp > thresholds.temperature_max) {
+        tempCard.classList.add('alert');
+        tempDot.className = 'sensor-status-dot critical';
+        tempStatus.textContent = `CRITICAL (>${thresholds.temperature_max}°C)`;
+    } else if (temp > thresholds.temperature_max * 0.9) {
+        tempCard.classList.remove('alert');
+        tempDot.className = 'sensor-status-dot warning';
+        tempStatus.textContent = 'Warning';
+    } else {
+        tempCard.classList.remove('alert');
+        tempDot.className = 'sensor-status-dot';
+        tempStatus.textContent = 'Normal';
+    }
+    
+    // Vibration
+    const vib = sensors.vibration_rms || 0;
+    document.getElementById('vibrationValue').innerHTML = `${vib.toFixed(3)}<span class="sensor-unit">g</span>`;
+    
+    const vibCard = document.getElementById('vibrationCard');
+    const vibDot = document.getElementById('vibrationStatusDot');
+    const vibStatus = document.getElementById('vibrationStatus');
+    
+    if (vib > thresholds.vibration_max) {
+        vibCard.classList.add('alert');
+        vibDot.className = 'sensor-status-dot critical';
+        vibStatus.textContent = `CRITICAL (>${thresholds.vibration_max}g)`;
+    } else if (vib > thresholds.vibration_max * 0.8) {
+        vibCard.classList.remove('alert');
+        vibDot.className = 'sensor-status-dot warning';
+        vibStatus.textContent = 'Warning';
+    } else {
+        vibCard.classList.remove('alert');
+        vibDot.className = 'sensor-status-dot';
+        vibStatus.textContent = 'Normal';
+    }
+    
+    // Current
+    const current = sensors.current;
+    document.getElementById('currentValue').innerHTML = `${current.toFixed(2)}<span class="sensor-unit">A</span>`;
+    
+    const currentCard = document.getElementById('currentCard');
+    const currentDot = document.getElementById('currentStatusDot');
+    const currentStatus = document.getElementById('currentStatus');
+    
+    if (current > thresholds.current_max) {
+        currentCard.classList.add('alert');
+        currentDot.className = 'sensor-status-dot critical';
+        currentStatus.textContent = `CRITICAL (>${thresholds.current_max}A)`;
+    } else if (current > thresholds.current_max * 0.8) {
+        currentCard.classList.remove('alert');
+        currentDot.className = 'sensor-status-dot warning';
+        currentStatus.textContent = 'Warning';
+    } else {
+        currentCard.classList.remove('alert');
+        currentDot.className = 'sensor-status-dot';
+        currentStatus.textContent = 'Normal';
+    }
+}
+
+function updatePredictionDisplays(data) {
+    const prediction = data.prediction;
+    
+    // RUL
+    document.getElementById('rulValue').textContent = prediction.rul.toFixed(1);
+    
+    // Update time
+    const now = new Date();
+    document.getElementById('rulUpdateTime').textContent = 
+        `Last updated: ${now.toLocaleTimeString()}`;
+    
+    // Confidence
+    document.getElementById('confidenceValue').textContent = `${prediction.confidence.toFixed(1)}%`;
+    
+    const confidenceLevel = document.getElementById('confidenceLevel');
+    if (prediction.confidence >= 80) {
+        confidenceLevel.textContent = 'High confidence';
+    } else if (prediction.confidence >= 60) {
+        confidenceLevel.textContent = 'Moderate confidence';
+    } else {
+        confidenceLevel.textContent = 'Low confidence';
+    }
+    
+    // Status
+    const statusEmojis = {
+        'healthy': '✅ HEALTHY',
+        'caution': '⚠️ CAUTION',
+        'critical': '🚨 CRITICAL'
+    };
+    document.getElementById('statusValue').textContent = statusEmojis[prediction.status] || '-- --';
+    
+    // Data source
+    const source = prediction.data_source || 'live';
+    const sourceEmoji = source === 'live' ? '🔴' : '📊';
+    document.getElementById('dataSourceValue').textContent = `${sourceEmoji} ${source.toUpperCase()}`;
+    document.getElementById('readingCount').textContent = `${data.reading_count || 0} readings`;
+}
+
+function updateCharts(historyData) {
+    const timestamps = historyData.timestamps.map(t => new Date(t));
+    
+    // Temperature Chart
+    const tempChart = liveState.charts.temperature;
+    tempChart.data.datasets[0].data = timestamps.map((t, i) => ({
+        x: t,
+        y: historyData.temperature[i]
+    }));
+    tempChart.data.datasets[1].data = timestamps.map(t => ({
+        x: t,
+        y: 85.0  // Threshold
+    }));
+    tempChart.update('none');
+    
+    // Vibration Chart
+    const vibChart = liveState.charts.vibration;
+    vibChart.data.datasets[0].data = timestamps.map((t, i) => ({
+        x: t,
+        y: historyData.vibration_rms[i]
+    }));
+    vibChart.data.datasets[1].data = timestamps.map(t => ({
+        x: t,
+        y: 2.5  // Threshold
+    }));
+    vibChart.update('none');
+    
+    // Current Chart
+    const currentChart = liveState.charts.current;
+    currentChart.data.datasets[0].data = timestamps.map((t, i) => ({
+        x: t,
+        y: historyData.current[i]
+    }));
+    currentChart.data.datasets[1].data = timestamps.map(t => ({
+        x: t,
+        y: 10.0  // Threshold
+    }));
+    currentChart.update('none');
+}
+
+function updateAlerts(alerts) {
+    const container = document.getElementById('alertsContainer');
+    
+    if (!alerts || alerts.length === 0) {
+        container.innerHTML = `
+            <div class="no-alerts">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
+                <div>No active alerts. All systems normal.</div>
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    alerts.forEach(alert => {
+        const severityIcons = {
+            'critical': '🚨',
+            'warning': '⚠️',
+            'info': 'ℹ️'
+        };
+        
+        html += `
+            <div class="alert-item ${alert.severity}">
+                <div class="alert-icon">${severityIcons[alert.severity]}</div>
+                <div class="alert-content">
+                    <div class="alert-message">${alert.message}</div>
+                    <div class="alert-timestamp">${new Date(alert.timestamp).toLocaleString()}</div>
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+function getCSRFToken() {
+    const token = document.querySelector('[name=csrfmiddlewaretoken]');
+    return token ? token.value : '';
+}
+
+console.log('✅ Live Dashboard JavaScript loaded');
+</script>
+{% endblock %}

@@ -1,17 +1,22 @@
-"""
-Dashboard App URL Configuration
-"""
+# dashboard/urls.py
+
 from django.urls import path
 from . import views
 
 app_name = 'dashboard'
 
 urlpatterns = [
-    # Main dashboard route (homepage)
-    path('', views.dashboard, name='dashboard'),
-    path('api/prediction/', views.get_prediction, name='get_prediction'), 
-
-    # API endpoints
-    path('api/index/', views.index, name='api_index'),
-    path('api/equipment/', views.equipment_list, name='api_equipment_list'),
+    # Main dashboards
+    path('', views.dashboard, name='dashboard'),  # Simulated/Historical dashboard
+    path('live/', views.live_dashboard, name='live_dashboard'),  # Live sensor dashboard
+    
+    # API endpoints - Simulated/Historical
+    path('api/', views.index, name='api_index'),
+    path('api/equipment/', views.equipment_list, name='equipment_list'),
+    path('api/prediction/', views.get_prediction, name='get_prediction'),
+    
+    # API endpoints - Live Sensors
+    path('api/live/reading/', views.live_reading, name='live_reading'),
+    path('api/live/prediction/', views.live_prediction, name='live_prediction'),
+    path('api/live/history/', views.live_sensor_history, name='live_sensor_history'),
 ]

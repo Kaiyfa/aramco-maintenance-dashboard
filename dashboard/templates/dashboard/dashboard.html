@@ -5,8 +5,6 @@
 
 {% block extra_css %}
 <style>
- 
-
     /* Root Variables - Light Mode */
     :root {
         --background: #f9fafb;
@@ -57,8 +55,8 @@
         -moz-osx-font-smoothing: grayscale;
     }
 
-   /* LAYOUT - Two Column Design */
-    
+    /* LAYOUT - Two Column Design */
+
 
     .dashboard-container {
         display: flex;
@@ -164,8 +162,8 @@
         accent-color: var(--primary);
     }
 
-    
-   /* SYSTEM INFO SECTION */
+
+    /* SYSTEM INFO SECTION */
 
     .system-info {
         margin-top: 2rem;
@@ -277,7 +275,7 @@
         color: var(--foreground);
     }
 
-   /* BUTTONS */
+    /* BUTTONS */
 
     .btn {
         display: inline-flex;
@@ -336,7 +334,7 @@
         }
     }
 
-   /* CARDS & METRICS */
+    /* CARDS & METRICS */
 
     .card {
         background: var(--card);
@@ -382,7 +380,7 @@
     }
 
 
-   /* GAUGES */
+    /* GAUGES */
 
     .gauge-container {
         display: flex;
@@ -448,8 +446,8 @@
         text-align: center;
     }
 
-   /* STATUS BADGES */
- 
+    /* STATUS BADGES */
+
 
     .status-badge {
         display: inline-flex;
@@ -480,8 +478,8 @@
         border-color: #fca5a5;
     }
 
-    
-   /* TABS */
+
+    /* TABS */
 
     .tabs {
         border-bottom: 1px solid var(--border);
@@ -522,7 +520,7 @@
         display: block;
     }
 
-   /* RECOMMENDATIONS */
+    /* RECOMMENDATIONS */
 
     .recommendations-header {
         margin-bottom: 2rem;
@@ -1022,7 +1020,7 @@
         color: var(--foreground);
     }
 
-     /* RESPONSIVE DESIGN  */
+    /* RESPONSIVE DESIGN  */
 
     @media (max-width: 1280px) {
         .metrics-grid {
@@ -1070,6 +1068,132 @@
             width: 100%;
             flex-direction: column;
         }
+    }
+
+    /* ============================================================================
+   LIVE MODE ENHANCEMENTS
+   ============================================================================ */
+
+    /* Live mode indicator */
+    .live-mode-active {
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.7;
+        }
+    }
+
+    /* Auto-refresh indicator */
+    .auto-refresh-indicator {
+        display: none;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid var(--status-healthy);
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        color: var(--status-healthy);
+    }
+
+    .auto-refresh-indicator.active {
+        display: flex;
+    }
+
+    .refresh-dot {
+        width: 0.5rem;
+        height: 0.5rem;
+        border-radius: 50%;
+        background-color: var(--status-healthy);
+        animation: blink 1s infinite;
+    }
+
+    @keyframes blink {
+
+        0%,
+        100% {
+            opacity: 1;
+        }
+
+        50% {
+            opacity: 0.3;
+        }
+    }
+
+    /* Live sensor readings - large display */
+    .live-sensor-readings {
+        display: none;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .live-sensor-readings.active {
+        display: grid;
+    }
+
+    .live-sensor-card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 0.75rem;
+        padding: 2rem;
+    }
+
+    .live-sensor-label {
+        font-size: 0.875rem;
+        color: var(--muted-foreground);
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        margin-bottom: 1rem;
+    }
+
+    .live-sensor-value {
+        font-family: 'Courier New', monospace;
+        font-size: 3.5rem;
+        font-weight: 700;
+        color: var(--foreground);
+    }
+
+    .live-sensor-unit {
+        font-size: 1.5rem;
+        color: var(--muted-foreground);
+        margin-left: 0.5rem;
+    }
+
+    .live-sensor-status {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        margin-top: 1rem;
+        font-size: 0.875rem;
+    }
+
+    .live-status-dot {
+        width: 0.75rem;
+        height: 0.75rem;
+        border-radius: 50%;
+        background-color: var(--status-healthy);
+    }
+
+    .live-status-dot.warning {
+        background-color: var(--status-caution);
+    }
+
+    .live-status-dot.critical {
+        background-color: var(--status-critical);
+    }
+
+    /* Hide prediction button in live mode */
+    #getPredictionBtn.live-mode {
+        display: none;
     }
 </style>
 {% endblock %}
@@ -1155,7 +1279,7 @@
         </div>
     </aside>
 
-         <!-- MAIN CONTENT - Dashboard & Tabs -->
+    <!-- MAIN CONTENT - Dashboard & Tabs -->
 
     <main class="main-content">
         <!-- Header -->
@@ -1172,6 +1296,10 @@
                 <div class="status-indicator">
                     <span class="status-dot" id="statusDot"></span>
                     <span class="status-text">STATUS</span>
+                </div>
+                <div class="auto-refresh-indicator" id="autoRefreshIndicator">
+                    <div class="refresh-dot"></div>
+                    <span>Auto-refreshing</span>
                 </div>
 
                 <!-- User Info -->
@@ -1198,6 +1326,48 @@
                     </svg>
                     <span id="btnText">Get Latest Prediction</span>
                 </button>
+            </div>
+        </div>
+
+        <!-- Live Sensor Readings (shown only in Live mode) -->
+        <div class="live-sensor-readings" id="liveSensorReadings">
+            <!-- Temperature -->
+            <div class="live-sensor-card" id="liveTempCard">
+                <div class="live-sensor-label">🌡️ TEMPERATURE</div>
+                <div class="live-sensor-value">
+                    <span id="liveTempValue">--</span>
+                    <span class="live-sensor-unit">°C</span>
+                </div>
+                <div class="live-sensor-status">
+                    <div class="live-status-dot" id="liveTempDot"></div>
+                    <span id="liveTempStatus">Waiting for data...</span>
+                </div>
+            </div>
+
+            <!-- Vibration -->
+            <div class="live-sensor-card" id="liveVibrationCard">
+                <div class="live-sensor-label">📊 VIBRATION (RMS)</div>
+                <div class="live-sensor-value">
+                    <span id="liveVibrationValue">--</span>
+                    <span class="live-sensor-unit">g</span>
+                </div>
+                <div class="live-sensor-status">
+                    <div class="live-status-dot" id="liveVibrationDot"></div>
+                    <span id="liveVibrationStatus">Waiting for data...</span>
+                </div>
+            </div>
+
+            <!-- Current -->
+            <div class="live-sensor-card" id="liveCurrentCard">
+                <div class="live-sensor-label">⚡ CURRENT</div>
+                <div class="live-sensor-value">
+                    <span id="liveCurrentValue">--</span>
+                    <span class="live-sensor-unit">A</span>
+                </div>
+                <div class="live-sensor-status">
+                    <div class="live-status-dot" id="liveCurrentDot"></div>
+                    <span id="liveCurrentStatus">Waiting for data...</span>
+                </div>
             </div>
         </div>
 
@@ -1392,15 +1562,17 @@
         equipmentType: 'Pump',
         equipmentId: 'EQ-006',
         location: 'Ghawar Field',
-        dataSource: 'simulated',
+        dataSource: 'simulated',  // 'simulated' or 'live'
+        isLiveMode: false,
         prediction: null,
-        recommendations: [],
-        alerts: [],
-        costImpact: null,
-        trendMetrics: null,
         history: [],
         totalPredictions: 0,
-        charts: {}
+        charts: {},
+
+        // Live mode intervals
+        liveSensorInterval: null,
+        livePredictionInterval: null,
+        liveHistoryInterval: null,
     };
 
     // INITIALIZATION
@@ -1607,6 +1779,7 @@
         dataSourceRadios.forEach(radio => {
             radio.addEventListener('change', function (e) {
                 state.dataSource = e.target.value;
+                handleDataSourceChange(e.target.value);
                 console.log(`Data source changed to: ${state.dataSource}`);
             });
         });
@@ -1627,6 +1800,264 @@
         });
 
         console.log('✅ Event listeners attached');
+    }
+
+
+    // DATA SOURCE CHANGE HANDLER
+    // ============================================================================
+
+    function handleDataSourceChange(dataSource) {
+        console.log(`🔄 Switching to ${dataSource.toUpperCase()} mode...`);
+
+        if (dataSource === 'live') {
+            activateLiveMode();
+        } else {
+            deactivateLiveMode();
+        }
+    }
+
+    function activateLiveMode() {
+        state.isLiveMode = true;
+
+        // Show live sensor readings
+        const liveSensorReadings = document.getElementById('liveSensorReadings');
+        if (liveSensorReadings) {
+            liveSensorReadings.classList.add('active');
+        }
+
+        // Hide "Get Prediction" button
+        const getPredictionBtn = document.getElementById('getPredictionBtn');
+        if (getPredictionBtn) {
+            getPredictionBtn.classList.add('live-mode');
+        }
+
+        // Show auto-refresh indicator
+        const autoRefreshIndicator = document.getElementById('autoRefreshIndicator');
+        if (autoRefreshIndicator) {
+            autoRefreshIndicator.classList.add('active');
+        }
+
+        // Make status indicator pulse
+        const statusDot = document.getElementById('statusDot');
+        if (statusDot) {
+            statusDot.classList.add('live-mode-active');
+        }
+
+        // Start live data polling
+        startLiveDataPolling();
+
+        console.log('✅ Live mode activated');
+    }
+
+    function deactivateLiveMode() {
+        state.isLiveMode = false;
+
+        // Hide live sensor readings
+        const liveSensorReadings = document.getElementById('liveSensorReadings');
+        if (liveSensorReadings) {
+            liveSensorReadings.classList.remove('active');
+        }
+
+        // Show "Get Prediction" button
+        const getPredictionBtn = document.getElementById('getPredictionBtn');
+        if (getPredictionBtn) {
+            getPredictionBtn.classList.remove('live-mode');
+        }
+
+        // Hide auto-refresh indicator
+        const autoRefreshIndicator = document.getElementById('autoRefreshIndicator');
+        if (autoRefreshIndicator) {
+            autoRefreshIndicator.classList.remove('active');
+        }
+
+        // Remove pulse from status indicator
+        const statusDot = document.getElementById('statusDot');
+        if (statusDot) {
+            statusDot.classList.remove('live-mode-active');
+        }
+
+        // Stop live data polling
+        stopLiveDataPolling();
+
+        console.log('✅ Simulated mode activated');
+    }
+
+    // ============================================================================
+    // LIVE DATA POLLING
+    // ============================================================================
+
+    function startLiveDataPolling() {
+        console.log('▶️  Starting live data polling...');
+
+        // Fetch immediately
+        fetchLiveSensorReading();
+        fetchLivePrediction();
+
+        // Set up intervals
+        state.liveSensorInterval = setInterval(fetchLiveSensorReading, 2000);  // 2 seconds
+        state.livePredictionInterval = setInterval(fetchLivePrediction, 300000);  // 5 minutes
+        state.liveHistoryInterval = setInterval(updateSensorTrendFromLive, 5000);  // 5 seconds
+    }
+
+    function stopLiveDataPolling() {
+        console.log('⏸  Stopping live data polling...');
+
+        clearInterval(state.liveSensorInterval);
+        clearInterval(state.livePredictionInterval);
+        clearInterval(state.liveHistoryInterval);
+    }
+
+    // ============================================================================
+    // LIVE API CALLS
+    // ============================================================================
+
+    async function fetchLiveSensorReading() {
+        try {
+            const response = await fetch(`/api/live/reading/?equipment_id=${state.equipmentId}`);
+            const data = await response.json();
+
+            if (data.success) {
+                updateLiveSensorDisplays(data);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching live sensor reading:', error);
+        }
+    }
+
+    async function fetchLivePrediction() {
+        try {
+            const csrfToken = getCSRFToken();
+
+            const response = await fetch(
+                `/api/live/prediction/?equipment_id=${state.equipmentId}&equipment_type=${state.equipmentType}&location=${state.location}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'X-CSRFToken': csrfToken
+                    }
+                }
+            );
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Update the same dashboard displays as simulated mode
+                updateDashboard(data);
+                state.totalPredictions++;
+                updateSystemInfo();
+            }
+        } catch (error) {
+            console.error('❌ Error fetching live prediction:', error);
+        }
+    }
+
+    async function updateSensorTrendFromLive() {
+        try {
+            const response = await fetch(`/api/live/history/?equipment_id=${state.equipmentId}&seconds=150`);
+            const data = await response.json();
+
+            if (data.success && data.data && data.data.sensors) {
+                // Update the sensor trend chart with live data
+                updateSensorTrendChartLive(data.data);
+            }
+        } catch (error) {
+            console.error('❌ Error fetching sensor history:', error);
+        }
+    }
+
+    function updateSensorTrendChartLive(liveData) {
+        if (!state.charts.sensorTrend) return;
+
+        const chart = state.charts.sensorTrend;
+
+        // Transform live data to match expected format
+        const timestamps = liveData.timestamps || [];
+        const temp = liveData.temperature || [];
+        const vibration = liveData.vibration_rms || [];
+        const current = liveData.current || [];
+
+        // Map to cycles (indices)
+        const cycles = timestamps.map((_, i) => i);
+
+        // Update chart
+        chart.data.labels = cycles;
+        chart.data.datasets[0].data = temp.map((val, i) => val);
+        chart.data.datasets[1].data = vibration.map((val, i) => val * 1000);  // Scale for visibility
+        chart.data.datasets[2].data = current.map((val, i) => val * 100);  // Scale for visibility
+
+        chart.update('none');
+    }
+
+    // ============================================================================
+    // LIVE SENSOR DISPLAY UPDATES
+    // ============================================================================
+
+    function updateLiveSensorDisplays(data) {
+        const sensors = data.sensors;
+        const thresholds = data.thresholds;
+
+        // Temperature
+        const temp = sensors.temperature;
+        document.getElementById('liveTempValue').textContent = temp.toFixed(1);
+
+        const tempDot = document.getElementById('liveTempDot');
+        const tempStatus = document.getElementById('liveTempStatus');
+
+        if (temp > thresholds.temperature_max) {
+            tempDot.className = 'live-status-dot critical';
+            tempStatus.textContent = `CRITICAL (>${thresholds.temperature_max}°C)`;
+            tempStatus.style.color = 'var(--status-critical)';
+        } else if (temp > thresholds.temperature_max * 0.9) {
+            tempDot.className = 'live-status-dot warning';
+            tempStatus.textContent = 'Warning - Elevated';
+            tempStatus.style.color = 'var(--status-caution)';
+        } else {
+            tempDot.className = 'live-status-dot';
+            tempStatus.textContent = 'Normal';
+            tempStatus.style.color = 'var(--foreground)';
+        }
+
+        // Vibration
+        const vib = sensors.vibration_rms || 0;
+        document.getElementById('liveVibrationValue').textContent = vib.toFixed(3);
+
+        const vibDot = document.getElementById('liveVibrationDot');
+        const vibStatus = document.getElementById('liveVibrationStatus');
+
+        if (vib > thresholds.vibration_max) {
+            vibDot.className = 'live-status-dot critical';
+            vibStatus.textContent = `CRITICAL (>${thresholds.vibration_max}g)`;
+            vibStatus.style.color = 'var(--status-critical)';
+        } else if (vib > thresholds.vibration_max * 0.8) {
+            vibDot.className = 'live-status-dot warning';
+            vibStatus.textContent = 'Warning - Elevated';
+            vibStatus.style.color = 'var(--status-caution)';
+        } else {
+            vibDot.className = 'live-status-dot';
+            vibStatus.textContent = 'Normal';
+            vibStatus.style.color = 'var(--foreground)';
+        }
+
+        // Current
+        const current = sensors.current;
+        document.getElementById('liveCurrentValue').textContent = current.toFixed(2);
+
+        const currentDot = document.getElementById('liveCurrentDot');
+        const currentStatus = document.getElementById('liveCurrentStatus');
+
+        if (current > thresholds.current_max) {
+            currentDot.className = 'live-status-dot critical';
+            currentStatus.textContent = `CRITICAL (>${thresholds.current_max}A)`;
+            currentStatus.style.color = 'var(--status-critical)';
+        } else if (current > thresholds.current_max * 0.8) {
+            currentDot.className = 'live-status-dot warning';
+            currentStatus.textContent = 'Warning - Elevated';
+            currentStatus.style.color = 'var(--status-caution)';
+        } else {
+            currentDot.className = 'live-status-dot';
+            currentStatus.textContent = 'Normal';
+            currentStatus.style.color = 'var(--foreground)';
+        }
     }
 
     // STATE MANAGEMENT
@@ -1758,6 +2189,38 @@
         updateCostImpact(data.costImpact);
 
         // Update trends
+        updateTrends(data.trendMetrics);
+
+        // Update system info
+        updateSystemInfo();
+
+        console.log('✅ Dashboard updated');
+
+
+        // 🆕 STORE DATABASE HISTORY
+        if (data.predictionHistory) {
+            state.predictionHistory = data.predictionHistory;
+        }
+
+        // Update metrics
+        updateMetrics(prediction);
+
+        // Update gauges
+        updateGauges(prediction);
+
+        // Update sensor trend chart
+        updateSensorTrendChart(prediction.sensor_data);
+
+        // Update recommendations
+        updateRecommendations(data.recommendations);
+
+        // Update alerts
+        updateAlerts(data.alerts);
+
+        // Update cost impact
+        updateCostImpact(data.costImpact);
+
+        // Update trends (NOW WITH DATABASE DATA)
         updateTrends(data.trendMetrics);
 
         // Update system info
@@ -2135,15 +2598,13 @@
             predictionsMade.textContent = state.totalPredictions;
         }
 
-        // Update prediction history
-        if (predictionHistoryList && state.history.length > 0) {
+        // ENHANCED: Use database history from API response
+        if (predictionHistoryList && state.predictionHistory && state.predictionHistory.length > 0) {
             let html = '';
 
-            // Show last 5 predictions
-            const recentHistory = state.history.slice(-5).reverse();
-
-            recentHistory.forEach((item, index) => {
-                const timeAgo = index === 0 ? 'Just now' : `${index * 5} minutes ago`;
+            state.predictionHistory.forEach((item, index) => {
+                const timestamp = new Date(item.timestamp);
+                const timeAgo = formatTimeAgo(timestamp);
 
                 html += `
                 <div class="prediction-history-item">
@@ -2158,8 +2619,8 @@
                             <span class="prediction-metric-value">${item.status}</span>
                         </span>
                         <span class="prediction-metric">
-                            <span class="prediction-metric-label">Confidence:</span>
-                            <span class="prediction-metric-value">${item.confidence}%</span>
+                            <span class="prediction-metric-label">Health:</span>
+                            <span class="prediction-metric-value">${item.average_health.toFixed(1)}%</span>
                         </span>
                     </div>
                 </div>
@@ -2168,6 +2629,17 @@
 
             predictionHistoryList.innerHTML = html;
         }
+    }
+
+    // Helper function for time formatting
+    function formatTimeAgo(date) {
+        const now = new Date();
+        const seconds = Math.floor((now - date) / 1000);
+
+        if (seconds < 60) return 'Just now';
+        if (seconds < 3600) return `${Math.floor(seconds / 60)} minutes ago`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)} hours ago`;
+        return `${Math.floor(seconds / 86400)} days ago`;
     }
 
     // SYSTEM INFO UPDATE
@@ -2244,9 +2716,8 @@
         return token ? token.value : '';
     }
 
-
     // GLOBAL EXPORTS (for inline onclick handlers)
-   
+
 
     window.handleRecommendationAction = handleRecommendationAction;
 
